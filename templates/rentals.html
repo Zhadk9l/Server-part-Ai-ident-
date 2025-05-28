@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>Оренди</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .filter-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .filter-container .form-select,
+        .filter-container .form-control {
+            width: 180px;
+        }
+        .modal-dialog {
+            max-width: 525px;
+        }
+        .modal-body img {
+            width: 150px;
+            margin: 5px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .modal-body img:hover {
+            opacity: 0.8;
+        }
+        .photo-section {
+            margin-top: 20px;
+        }
+        .photo-section h6 {
+            margin-bottom: 10px;
+        }
+        .damage-list ul {
+            padding-left: 20px;
+        }
+        .rental-info {
+            margin-bottom: 10px;
+        }
+        .rental-info span {
+            font-weight: bold;
+        }
+        .user-name {
+            font-weight: normal;
+            font-size: 16px;
+        }
+        .date {
+            font-size: 14px;
+        }
+        .modal-title {
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .damage-flag {
+        background-color: #ffcccc !important;
+        }
+    </style>
+
+</head>
+
+<body>
+
+<div class="container mt-5">
+    <div class="d-flex justify-content-between mb-4">
+        <h1>📄 Оренди</h1>
+        <div>
+            <a href="/admin/add_rental" class="btn btn-warning">➕ Додати оренду</a>
+            <a href="/admin/panel" class="btn btn-secondary ms-2">⬅️ Назад</a>
+        </div>
+    </div>
+
+    <!-- Фільтри -->
+    <div class="filter-container">
+        <div>
+            <label for="statusFilter" class="form-label">Статус</label>
+            <select id="statusFilter" class="form-select" onchange="searchTable()">
+                <option value="all">Всі оренди</option>
+                <option value="активна">Активні оренди</option>
+                <option value="завершено">Завершені оренди</option>
+            </select>
+        </div>
+        <div>
+            <label for="startDateFilter" class="form-label">Початок</label>
+            <input type="date" id="startDateFilter" class="form-control" onchange="searchTable()">
+        </div>
+        <div>
+            <label for="endDateFilter" class="form-label">Кінець</label>
+            <input type="date" id="endDateFilter" class="form-control" onchange="searchTable()">
+        </div>
+        <div>
+            <label for="searchInput" class="form-label">Пошук</label>
+            <input type="text" id="searchInput" onkeyup="searchTable()" class="form-control" placeholder="🔍 Пошук по фамілії або номеру машини">
+        </div>
+    </div>
+
+    <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+        <table class="table table-hover" id="rentalsTable">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Користувач</th>
+                    <th>Авто</th>
+                    <th>Початок</th>
+                    <th>Кінець</th>
+                    <th>Статус</th>
+                    <th>Дії</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for rental in rentals %}
+                <tr>
+                    <td>{{ rental.rental_id }}</td>
+                    <td>{{ rental.user.first_name }} {{ rental.user.last_name }}</td>
+                    <td>{{ rental.car.license_plate }}</td>
+                    <td>{{ rental.rental_start }}</td>
+                    <td>{{ rental.rental_end }}</td>
+                    <td>
+                        {% if rental.has_new_damage and not rental.is_ended %}
+                            {{'🔴 Активна (з пошкодженням)'}}
+                        {% else %}
+                            {{ 'Завершено' if rental.is_ended else 'Активна' }}
+                        {% endif %}
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-info" onclick="openModal({{ rental.rental_id }})">Детально</button>
+                        <button class="btn btn-sm btn-warning ms-1" onclick="openEditModal({{ rental.rental_id }}, '{{ rental.rental_end }}')">Редагувати</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Модальне вікно для детальної інформації -->
+<div class="modal fade" id="rentalModal" tabindex="-1" aria-labelledby="rentalModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="rentalModalLabel">Детальна інформація про оренду</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрити"></button>
+      </div>
+      <div class="modal-body" id="rentalDetails">
+        <!-- Контент буде підставлений динамічно -->
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрити</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Модальне вікно для повного перегляду фото -->
+<div class="modal fade" id="photoModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content bg-transparent border-0">
+      <canvas id="photoCanvas" style="width: 100%; border-radius:10px;"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- Модальне вікно для редагування дати -->
+<div class="modal fade" id="editRentalModal" tabindex="-1" aria-labelledby="editRentalModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <form id="editRentalForm" class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="editRentalModalLabel">Редагувати оренду</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрити"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label for="newEndDate" class="form-label">Нова дата закінчення оренди</label>
+          <input type="datetime-local" id="newEndDate" name="newEndDate" class="form-control" required>
+        </div>
+        <input type="hidden" id="editRentalId" name="rental_id">
+      </div>
+      <div class="modal-footer">
+        <button type="submit" class="btn btn-primary">Зберегти зміни</button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Скасувати</button>
+      </div>
+    </form>
+  </div>
+</div>
+<!-- Модальне вікно для завантаження after-фото -->
+<div class="modal fade" id="uploadAfterPhotosModal" tabindex="-1" aria-labelledby="uploadAfterPhotosLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form id="uploadAfterPhotosForm">
+        <div class="modal-header">
+          <h5 class="modal-title" id="uploadAfterPhotosLabel">Завантажити фото після оренди</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрити"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="uploadRentalId" name="rental_id" value="">
+          <div id="photoInputsContainer">
+            <!-- 8 інпутів для фото -->
+            <div class="mb-3">
+              <label for="photo1" class="form-label">Фото лобового скла</label>
+              <input class="form-control" type="file" id="photo1" name="photo1" accept="image/*" required>
+            </div>
+            <div class="mb-3">
+              <label for="photo2" class="form-label">Фото переднього бампера </label>
+              <input class="form-control" type="file" id="photo2" name="photo2" accept="image/*" required>
+            </div>
+            <div class="mb-3">
+              <label for="photo3" class="form-label">Фото лівого крила</label>
+              <input class="form-control" type="file" id="photo3" name="photo3" accept="image/*" required>
+            </div>
+            <div class="mb-3">
+              <label for="photo4" class="form-label">Фото правого крила</label>
+              <input class="form-control" type="file" id="photo4" name="photo4" accept="image/*" required>
+            </div>
+            <div class="mb-3">
+              <label for="photo5" class="form-label">Фото лівих дверей</label>
+              <input class="form-control" type="file" id="photo5" name="photo5" accept="image/*" required>
+            </div>
+            <div class="mb-3">
+              <label for="photo6" class="form-label">Фото правих дверей</label>
+              <input class="form-control" type="file" id="photo6" name="photo6" accept="image/*" required>
+            </div>
+            <div class="mb-3">
+              <label for="photo7" class="form-label">Фото заднього бампера з лівим крилом</label>
+              <input class="form-control" type="file" id="photo7" name="photo7" accept="image/*" required>
+            </div>
+            <div class="mb-3">
+              <label for="photo8" class="form-label">Фото заднього бампера з правим крилом</label>
+              <input class="form-control" type="file" id="photo8" name="photo8" accept="image/*" required>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary">Завантажити фото</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Відмінити</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<script>
+  // Глобальні змінні для модальних вікон
+  let editRentalModalInstance;
+
+  // Функція для відкриття модального вікна завантаження фото після оренди
+  function openUploadAfterPhotosModal(rentalId) {
+    document.getElementById('uploadRentalId').value = rentalId;
+    const uploadModalElement = document.getElementById('uploadAfterPhotosModal');
+    const uploadModal = new bootstrap.Modal(uploadModalElement);
+    uploadModal.show();
+  }
+
+  // Функція для фільтрації таблиці оренд за різними параметрами
+  function searchTable() {
+    const input = document.getElementById("searchInput").value.toLowerCase();
+    const filterStatus = document.getElementById("statusFilter").value;
+    const filterStart = document.getElementById("startDateFilter").value;
+    const filterEnd = document.getElementById("endDateFilter").value;
+    const rows = document.querySelectorAll("#rentalsTable tbody tr");
+
+    rows.forEach(row => {
+      const userName = row.querySelector("td:nth-child(2)").innerText.toLowerCase();
+      const carLicense = row.querySelector("td:nth-child(3)").innerText.toLowerCase();
+      const rentalStart = row.querySelector("td:nth-child(4)").innerText;
+      const rentalEnd = row.querySelector("td:nth-child(5)").innerText;
+      const rentalStatus = row.querySelector("td:nth-child(6)").innerText.toLowerCase();
+
+      let match = userName.includes(input) || carLicense.includes(input);
+
+      if (filterStatus !== "all") {
+        match = match && rentalStatus.includes(filterStatus);
+      }
+      if (filterStart) {
+        match = match && rentalStart.includes(filterStart);
+      }
+      if (filterEnd) {
+        match = match && rentalEnd.includes(filterEnd);
+      }
+
+      row.style.display = match ? "" : "none";
+    });
+  }
+
+  // Функція для відкриття детальної інформації про оренду
+  async function openModal(rentalId) {
+    try {
+      const response = await fetch(`/admin/rental_details/${rentalId}`);
+      if (!response.ok) throw new Error('Не вдалося завантажити дані оренди');
+      const data = await response.json();
+
+      const rentalStart = new Date(data.rental_start).toLocaleString('uk-UA');
+      const rentalEnd = new Date(data.rental_end).toLocaleString('uk-UA');
+
+      const photosBefore = data.photos_before.map(photo =>
+        `<img src="/${photo.replace(/\\/g, "/")}" alt="Фото до оренди" onclick="openFullScreenPhoto('/${photo.replace(/\\/g, "/")}')"/>`
+      ).join('');
+
+      const photosAfter = data.photos_after.map(photo =>
+        `<img src="/${photo.replace(/\\/g, "/")}" alt="Фото після оренди" onclick="openFullScreenPhoto('/${photo.replace(/\\/g, "/")}')"/>`
+      ).join('');
+
+      const damagesBefore = data.damages_before.map(damage =>
+        `<li>${damage.damage_type} (Confidence: ${damage.confidence})</li>`
+      ).join('');
+
+      const damagesAfter = data.damages_after.map(damage =>
+        `<li>${damage.damage_type} (Confidence: ${damage.confidence})</li>`
+      ).join('');
+
+      document.getElementById('rentalDetails').innerHTML = `
+        <div class="rental-info">
+          <p><span>Користувач:</span> ${data.user.first_name} ${data.user.last_name}</p>
+          <p><span>Автомобіль:</span> ${data.car.make} ${data.car.model}, ${data.car.license_plate}</p>
+          <p><span>Початок оренди:</span> ${rentalStart}</p>
+          <p><span>Кінець оренди:</span> ${rentalEnd}</p>
+          <p><span>Статус оренди:</span> ${data.is_ended ? 'Завершено' : 'Активна'}</p>
+        </div>
+        <div class="photo-section">
+          <h6>Фотографії до оренди:</h6>${photosBefore}
+        </div>
+        <div class="damage-list">
+          <h6>Пошкодження до оренди:</h6><ul>${damagesBefore}</ul>
+        </div>
+        <div class="photo-section">
+          <h6>Фотографії після оренди:</h6>${photosAfter}
+        </div>
+        <div class="damage-list">
+          <h6>Пошкодження після оренди:</h6><ul>${damagesAfter}</ul>
+        </div>
+      `;
+
+      const modalFooter = document.querySelector("#rentalModal .modal-footer");
+      modalFooter.innerHTML = `
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрити</button>
+        ${data.damage_check && !data.is_ended && !data.has_after_photos ? `<button type="button" class="btn btn-primary ms-2" onclick="openUploadAfterPhotosModal(${rentalId})">Обстежити транспорт</button>` : ''}
+        ${!data.is_ended && data.has_new_damage ? `<button type="button" class="btn btn-danger" onclick="endRental(${rentalId})">Завершити оренду</button>` : ''}
+      `;
+
+      const rentalModalElement = document.getElementById('rentalModal');
+      const rentalModal = new bootstrap.Modal(rentalModalElement);
+      rentalModal.show();
+
+    } catch (error) {
+      console.error('Помилка:', error);
+      alert('Не вдалося завантажити деталі оренди');
+    }
+  }
+
+  // Функція завершення оренди
+  async function endRental(rentalId) {
+    try {
+      const response = await fetch(`/update_rental_end/${rentalId}`, { method: 'PATCH' });
+      if (response.ok) {
+        alert("✅ Оренду завершено");
+        location.reload();
+      } else {
+        alert("❌ Помилка при завершенні оренди");
+      }
+    } catch (error) {
+      console.error("Помилка:", error);
+      alert("❌ Сталася помилка під час завершення");
+    }
+  }
+
+  // Функція відкриття фото у повноекранному режимі з малюванням пошкоджень
+  function openFullScreenPhoto(src) {
+    const canvas = document.getElementById('photoCanvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+
+    img.onload = function() {
+      canvas.width = img.width;
+      canvas.height = img.height;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, img.width, img.height);
+
+      fetch(`/get_damages_by_photo?photo_path=${encodeURIComponent(src)}`)
+        .then(response => response.json())
+        .then(damages => {
+          damages.forEach(damage => {
+            const box = JSON.parse(damage.box); // [x1, y1, x2, y2]
+            drawBox(ctx, box, damage.damage_type);
+          });
+        })
+        .catch(error => console.error('Помилка завантаження пошкоджень:', error));
+    };
+
+    img.src = src;
+
+    const photoModal = new bootstrap.Modal(document.getElementById('photoModal'));
+    photoModal.show();
+  }
+
+  // Функція малювання прямокутника і підпису на canvas
+  function drawBox(ctx, box, label) {
+    ctx.beginPath();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "red";
+    ctx.rect(box[0], box[1], box[2] - box[0], box[3] - box[1]);
+    ctx.stroke();
+
+    ctx.font = "16px Arial";
+    ctx.fillStyle = "red";
+    ctx.fillText(label, box[0] + 5, box[1] - 5);
+  }
+
+  // Функція відкриття модального вікна редагування оренди
+  function openEditModal(rentalId, currentEndDate) {
+    document.getElementById('editRentalId').value = rentalId;
+
+    if (currentEndDate) {
+      const formatted = new Date(currentEndDate).toISOString().slice(0, 16); // yyyy-MM-ddThh:mm
+      document.getElementById('newEndDate').value = formatted;
+    }
+
+    const modalElement = document.getElementById('editRentalModal');
+    editRentalModalInstance = new bootstrap.Modal(modalElement);
+    editRentalModalInstance.show();
+  }
+
+  // Ініціалізація подій після завантаження DOM
+  document.addEventListener('DOMContentLoaded', () => {
+    // Обробник сабміту форми завантаження after-фото
+    document.getElementById('uploadAfterPhotosForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+
+      const rentalId = document.getElementById('uploadRentalId').value;
+
+      for (let i = 1; i <= 8; i++) {
+        const photoInput = document.getElementById(`photo${i}`);
+        if (photoInput.files.length === 0) {
+          alert(`Будь ласка, виберіть фото ${i}`);
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append('rental_id', rentalId);
+        formData.append('user_id', '0');
+        formData.append('photo_type', `after_${i}`);
+        formData.append('image', photoInput.files[0], `after_${i}.jpg`);
+
+        try {
+          const resp = await fetch('/process_photo/', {
+            method: 'POST',
+            body: formData
+          });
+
+          if (!resp.ok) {
+            throw new Error(`Помилка завантаження фото ${i}`);
+          }
+        } catch (error) {
+          alert(error.message);
+          console.error(error);
+          return;
+        }
+      }
+
+      alert('Фото після оренди успішно завантажені!');
+      const modalInstance = bootstrap.Modal.getInstance(document.getElementById('uploadAfterPhotosModal'));
+      modalInstance.hide();
+      location.reload();
+    });
+
+    // Обробник сабміту форми редагування оренди
+    document.getElementById('editRentalForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+
+      const rentalId = document.getElementById('editRentalId').value;
+      const newEndDate = document.getElementById('newEndDate').value;
+
+      try {
+        const response = await fetch(`/admin/update_rental_data_end/${rentalId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ rental_end: newEndDate })
+        });
+
+        if (response.ok) {
+          location.reload();
+        } else {
+          alert('Помилка оновлення оренди!');
+        }
+      } catch (error) {
+        console.error('Помилка:', error);
+        alert('Сталася помилка');
+      }
+    });
+  });
+
+  // Прив'язуємо функції у глобальну область видимості (щоб виклики з onclick працювали)
+  window.openUploadAfterPhotosModal = openUploadAfterPhotosModal;
+  window.openModal = openModal;
+  window.endRental = endRental;
+  window.openFullScreenPhoto = openFullScreenPhoto;
+  window.openEditModal = openEditModal;
+  window.searchTable = searchTable;
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+</body>
+</html>

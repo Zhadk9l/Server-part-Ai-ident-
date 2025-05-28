@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>Машини</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: #f8f9fa;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container mt-5">
+    <div class="d-flex justify-content-between mb-4">
+        <h1>🚘 Машини</h1>
+        <div>
+            <a href="/admin/add_car" class="btn btn-primary">➕ Додати автомобіль</a>
+            <a href="/admin/panel" class="btn btn-secondary ms-2">⬅️ Назад</a>
+        </div>
+    </div>
+
+    <!-- Повідомлення про успіх або помилку -->
+    {% if error %}
+        <div class="alert alert-danger">
+            {{ error }}
+        </div>
+    {% endif %}
+    {% if success %}
+        <div class="alert alert-success">
+            {{ success }}
+        </div>
+    {% endif %}
+
+    <!-- Поле для пошуку -->
+    <input type="text" id="searchInput" onkeyup="searchTable()" class="form-control mb-3" placeholder="🔍 Пошук по марці, моделі або номеру">
+
+    <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+        <table class="table table-hover" id="carsTable">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Марка</th>
+                    <th>Модель</th>
+                    <th>Рік</th>
+                    <th>Номер</th>
+                    <th>Статус</th>
+                    <th>Дії</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for car in cars %}
+                <tr>
+                    <td>{{ car.car_id }}</td>
+                    <td>{{ car.make }}</td>
+                    <td>{{ car.model }}</td>
+                    <td>{{ car.year }}</td>
+                    <td>{{ car.license_plate }}</td>
+                    <td>{{ "В оренді" if car.status == "in_rent" else "Не в оренді" }}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary me-2"
+                                onclick="openEditCarModal({{ car.car_id }}, '{{ car.make }}', '{{ car.model }}', {{ car.year }}, '{{ car.license_plate }}', '{{ car.status }}')">
+                            Редагувати
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteCar({{ car.car_id }})">Видалити</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Модальне вікно редагування автомобіля -->
+<div class="modal fade" id="editCarModal" tabindex="-1" aria-labelledby="editCarModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <form id="editCarForm" class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="editCarModalLabel">Редагувати автомобіль</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрити"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="editCarId">
+        <div class="mb-3">
+          <label class="form-label">Марка</label>
+          <input type="text" class="form-control" id="editMake" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Модель</label>
+          <input type="text" class="form-control" id="editModel" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Рік</label>
+          <input type="number" class="form-control" id="editYear" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Номер</label>
+          <input type="text" class="form-control" id="editLicensePlate" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Статус</label>
+          <select class="form-select" id="editStatus">
+            <option value="available">Не в оренді</option>
+            <option value="in_rent">В оренді</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="submit" class="btn btn-success">Зберегти</button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Скасувати</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+function searchTable() {
+    let input = document.getElementById("searchInput").value.toLowerCase();
+    let rows = document.querySelectorAll("#carsTable tbody tr");
+
+    rows.forEach(row => {
+        let brand = row.querySelector("td:nth-child(2)").innerText.toLowerCase();
+        let licensePlate = row.querySelector("td:nth-child(5)").innerText.toLowerCase();
+        row.style.display = (brand.includes(input) || licensePlate.includes(input)) ? "" : "none";
+    });
+}
+
+function openEditCarModal(id, make, model, year, plate, status) {
+    document.getElementById('editCarId').value = id;
+    document.getElementById('editMake').value = make;
+    document.getElementById('editModel').value = model;
+    document.getElementById('editYear').value = year;
+    document.getElementById('editLicensePlate').value = plate;
+    document.getElementById('editStatus').value = status;
+
+    const modal = new bootstrap.Modal(document.getElementById('editCarModal'));
+    modal.show();
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    document.getElementById('editCarForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+
+        const id = document.getElementById('editCarId').value;
+        const data = {
+            make: document.getElementById('editMake').value,
+            model: document.getElementById('editModel').value,
+            year: parseInt(document.getElementById('editYear').value),
+            license_plate: document.getElementById('editLicensePlate').value,
+            status: document.getElementById('editStatus').value
+        };
+
+        fetch(`/admin/update_car/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        }).then(res => {
+            if (res.ok) {
+                location.reload();
+            } else {
+                alert('Не вдалося оновити дані');
+            }
+        });
+    });
+});
+
+function deleteCar(carId) {
+    fetch(`/admin/delete_car/${carId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.detail) {
+                alert(data.detail);  // Покажемо повідомлення про помилку
+            } else {
+                location.reload();  // Перезавантажимо сторінку після успішного видалення
+            }
+        })
+        .catch(error => {
+            alert('Сталася помилка під час видалення');
+        });
+}
+</script>
+
+</body>
+</html>

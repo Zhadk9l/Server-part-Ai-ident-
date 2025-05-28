@@ -1,0 +1,55 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+env/
+.venv/
+ENV/
+
+# PyCharm specific
+.idea/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+
+# Logs
+*.log
+
+# Test / coverage
+htmlcov/
+.tox/
+.nox/
+.coverage
+.cache
+coverage.xml
+*.cover
+
+# Environment variables
+.env
+.env.*
+
+# Uploaded/processed images and results
+uploads/
+*.jpg
+*.png
+*.jpeg
+*.bmp
+
+# Model files
+*.pt
+*.onnx
+best.pt
+runs/
+
+# Database files
+*.sqlite3
+*.db
+
+# Misc
+.DS_Store
+Thumbs.db

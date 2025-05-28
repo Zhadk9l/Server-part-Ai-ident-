@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>Додати автомобіль</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+
+<div class="container mt-5">
+    <div class="d-flex justify-content-between mb-4">
+        <h1>➕ Додати автомобіль</h1>
+        <div>
+            <a href="/admin/cars" class="btn btn-secondary ms-2">⬅️ Назад</a>
+        </div>
+    </div>
+
+    <!-- Повідомлення про успіх -->
+    {% if success %}
+        <div class="alert alert-success">
+            {{ success }}
+        </div>
+    {% endif %}
+
+    <!-- Повідомлення про помилку -->
+    {% if error %}
+        <div class="alert alert-danger">
+            {{ error }}
+        </div>
+    {% endif %}
+
+    <div class="card p-4 shadow-sm">
+        <form method="post" action="/admin/add_car">
+            <div class="mb-3">
+                <label class="form-label">Марка</label>
+                <input type="text" name="make" class="form-control" placeholder="Наприклад: Toyota" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Модель</label>
+                <input type="text" name="model" class="form-control" placeholder="Наприклад: Camry" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Рік випуску</label>
+                <input type="number" name="year" class="form-control" placeholder="2022" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Номерний знак</label>
+                <input type="text" name="license_plate" class="form-control" placeholder="AA1234BB" required>
+            </div>
+            <button type="submit" class="btn btn-primary w-100">➕ Додати автомобіль</button>
+        </form>
+    </div>
+</div>
+
+</body>
+</html>
